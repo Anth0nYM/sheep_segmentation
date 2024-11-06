@@ -14,7 +14,7 @@ if __name__ == '__main__':
     print(len(val_dataloader))
     print(len(test_dataloader))
     EPOCHS = 0
-    for epoch in range(0, EPOCHS):
+    for epoch in range(EPOCHS):
         for image, mask in train_dataloader:
             image = image.detach().cpu().numpy()[0].transpose(1, 2, 0)
             mask = mask.detach().cpu().numpy()[0]

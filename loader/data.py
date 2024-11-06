@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader, Subset, random_split
 from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from typing import MatLike, Any,  Optional, Callable
+from typing import Any,  Optional, Callable
 
 
 class Data(Dataset):
@@ -21,7 +21,7 @@ class Data(Dataset):
     def __len__(self) -> int:
         return len(self._img_paths)
 
-    def __getitem__(self, idx: int) -> tuple[MatLike | Any, MatLike | Any]:
+    def __getitem__(self, idx: int) -> tuple[Any, Any]:
         image_path = self._img_paths[idx]
         image_name = image_path[15:-4]
         mask_path = self._mask_paths[idx]
