@@ -69,36 +69,42 @@ class CustomDataLoader:
         )
         self._train_set, self._val_set, self._test_set = self._split_dataset()
 
-    def _get_transforms(self) -> dict[str, A.Compose]:
+    def _get_transforms(self, proba: float = 0.5) -> dict[str, A.Compose]:
         # TODO ainda não decidi qual exatamente será meu aumento de dados
-        # TODO(Quero fazer uma análise de quais são os melhores)
+        # TODO (Quero fazer uma análise de quais são os melhores)
         train_transform = (
             A.Compose([
                 A.Resize(height=self._img_size, width=self._img_size),
                 # A.RandomCrop(height=self._img_size, width=self._img_size),
-                # A.CLAHE(),
-                # A.RandomBrightnessContrast(),
-                # A.Blur(),
-                # A.HueSaturationValue(),
-                # A.HorizontalFlip(),
-                # A.VerticalFlip(),
-                # A.RandomRotate90(),
-                # A.Transpose(),
+                # Color intensity
+                # A.CLAHE(p=proba),
+                # A.RandomBrightnessContrast(p=proba),
+                # A.Blur(p=proba),
+                # A.HueSaturationValue(p=proba),
+
+                # Geometric
+                # A.HorizontalFlip(p=proba),
+                # A.VerticalFlip(p=proba),
+                # A.RandomRotate90(p=proba),
+                # A.Transpose(p=proba),
                 # A.ShiftScaleRotate(
-                #     shift_limit=0.0625, scale_limit=0.2, rotate_limit=45
-                # ),
-                # A.ElasticTransform(alpha=120, sigma=120 * 0.05),
-                # A.GridDistortion(),
-                # A.OpticalDistortion(distort_limit=2, shift_limit=0.5),
+                #     shift_limit=0.0625, scale_limit=0.2, rotate_limit=45,
+                # p=proba),
+                # Distortion
+                A.ElasticTransform(alpha=120, sigma=120 * 0.05, p=proba),
+                A.GridDistortion(p=proba),
+                A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=proba),
+
                 ToTensorV2()
+
             ]) if self._augment else A.Compose([
-                A.Resize(height=self._img_size, width=self._img_size),
+                A.RandomCrop(height=self._img_size, width=self._img_size),
                 ToTensorV2()
             ])
         )
 
         val_test_transform = A.Compose([
-            A.Resize(height=self._img_size, width=self._img_size),
+            A.RandomCrop(height=self._img_size, width=self._img_size),
             ToTensorV2()
         ])
 
