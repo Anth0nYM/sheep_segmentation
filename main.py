@@ -1,24 +1,36 @@
 import cv2
-import loader
+import segmentation
 
 if __name__ == '__main__':
-    dataloader = loader.Dataloader(batch_size=3,
-                                   size=512,
-                                   shuffle=True,
-                                   description=False)
+    dataloader = segmentation.CustomDataLoader(
+        batch_size=3,
+        img_size=512,
+        shuffle=True,
+        augment=True,
+        show_progress=True
+    )
 
     train_dataloader = dataloader.get_train_dataloader()
     val_dataloader = dataloader.get_val_dataloader()
     test_dataloader = dataloader.get_test_dataloader()
+
     print(len(train_dataloader))
     print(len(val_dataloader))
     print(len(test_dataloader))
-    EPOCHS = 0
+
+    EPOCHS = 1
+
     for epoch in range(EPOCHS):
-        for image, mask in train_dataloader:
-            image = image.detach().cpu().numpy()[0].transpose(1, 2, 0)
-            mask = mask.detach().cpu().numpy()[0]
-            cv2.imshow('image', image)
-            cv2.imshow('mask', mask)
+        print(f"Epoch {epoch + 1}/{EPOCHS}")
+        for image_batch, mask_batch in train_dataloader:
+            image = image_batch[0].detach().cpu().numpy().transpose(1, 2, 0)
+            mask = mask_batch[0].detach().cpu().numpy()
+
+            cv2.imshow('Image', image)
+            cv2.imshow('Mask', mask)
+
             if cv2.waitKey(1) == ord('q'):
                 break
+        break
+
+    cv2.destroyAllWindows()
