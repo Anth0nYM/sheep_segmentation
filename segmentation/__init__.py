@@ -1,3 +1,3 @@
 from .data import CustomDataLoader
-
-__all__ = ['CustomDataLoader']
+from .model import Model
+__all__ = ['CustomDataLoader', 'Model']

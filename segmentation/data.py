@@ -33,12 +33,13 @@ class SheepDataset(Dataset):
             raise ValueError(f'Name mismatch: {image_name}, {mask_name}')
 
         image = cv2.imread(image_path)
-        mask = cv2.imread(mask_path)
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
         if self._transform:
             transformed = self._transform(image=image, mask=mask)
             image, mask = transformed['image'], transformed['mask']
 
+        mask = mask.unsqueeze(0)  # type: ignore
         return image, mask
 
 
@@ -70,41 +71,23 @@ class CustomDataLoader:
         self._train_set, self._val_set, self._test_set = self._split_dataset()
 
     def _get_transforms(self, proba: float = 0.5) -> dict[str, A.Compose]:
-        # TODO ainda não decidi qual exatamente será meu aumento de dados
-        # TODO (Quero fazer uma análise de quais são os melhores)
         train_transform = (
             A.Compose([
                 A.Resize(height=self._img_size, width=self._img_size),
-                # A.RandomCrop(height=self._img_size, width=self._img_size),
-                # Color intensity
-                # A.CLAHE(p=proba),
-                # A.RandomBrightnessContrast(p=proba),
-                # A.Blur(p=proba),
-                # A.HueSaturationValue(p=proba),
-
-                # Geometric
-                # A.HorizontalFlip(p=proba),
-                # A.VerticalFlip(p=proba),
-                # A.RandomRotate90(p=proba),
-                # A.Transpose(p=proba),
-                # A.ShiftScaleRotate(
-                #     shift_limit=0.0625, scale_limit=0.2, rotate_limit=45,
-                # p=proba),
-                # Distortion
-                A.ElasticTransform(alpha=120, sigma=120 * 0.05, p=proba),
-                A.GridDistortion(p=proba),
-                A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=proba),
-
+                A.Normalize(mean=(0.485, 0.456, 0.406),
+                            std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
-
             ]) if self._augment else A.Compose([
-                A.RandomCrop(height=self._img_size, width=self._img_size),
+                A.Resize(height=self._img_size, width=self._img_size),
+                A.Normalize(mean=(0.485, 0.456, 0.406),
+                            std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
             ])
         )
 
         val_test_transform = A.Compose([
-            A.RandomCrop(height=self._img_size, width=self._img_size),
+            A.Resize(height=self._img_size, width=self._img_size),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2()
         ])
 
