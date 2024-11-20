@@ -7,8 +7,8 @@ from tqdm import tqdm
 if __name__ == '__main__':
     BATCH_SIZE = 2
     dataloader = segmentation.CustomDataLoader(
-        batch_size=3,
-        img_size=512,
+        batch_size=8,
+        img_size=512,  # Unet use 512x512 images
         subset_size=None,
         shuffle=True,
         augment=False,
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     train_dataloader = dataloader.get_train_dataloader()
     val_dataloader = dataloader.get_val_dataloader()
     test_dataloader = dataloader.get_test_dataloader()
-    model = segmentation.Model('pan')
+    model = segmentation.Model('unet')
     criterion = nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     EPOCHS = 1
