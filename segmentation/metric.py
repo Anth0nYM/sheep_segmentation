@@ -48,43 +48,53 @@ class MetricSegmentation:
                     ):
 
         self._init_metric_for_epoch(epoch, split)
-        y_true = self._torch2np(yt)
-        y_pred = self._torch2np(yp)
 
         self._metric_images[split][epoch].append(
             ImageMetric(
-                self._iou(y_true, y_pred),
-                self._dice(y_true, y_pred),
+                self._iou(yt, yp),
+                self._dice(yt, yp),
                 self._current_batch))
         last = self._metric_images[split][epoch][-1]
 
         return last.iou_batch_mean(), last.dice_batch_mean()
 
     def _iou(self,
-             y_true: np.ndarray,
-             y_pred: np.ndarray
+             y_true: torch.Tensor,
+             y_pred: torch.Tensor
              ) -> list[float]:
 
         iou_list = []
         for i in range(self._num_clases):
-            intersection = np.logical_and(y_true[:, i], y_pred[:, i]).sum()
-            union = np.logical_or(y_true[:, i], y_pred[:, i]).sum()
-            iou = intersection / union if union != 0 else 1
-            iou_list.append(iou)
+            y_true_cls = y_true[:, i, :, :]
+            y_pred_cls = y_pred[:, i, :, :]
+
+            intersection = torch.sum(y_true_cls * y_pred_cls, dim=(1, 2))
+            union = torch.sum(y_true_cls, dim=(1, 2)) + \
+                torch.sum(y_pred_cls, dim=(1, 2)) - intersection
+
+            # Prevents zero division
+            iou = intersection / torch.clamp(union, min=1e-6)
+            iou_list.append(iou.mean().item())  # Mean over batch
+
         return iou_list
 
     def _dice(self,
-              y_true: np.ndarray,
-              y_pred: np.ndarray
+              y_true: torch.Tensor,
+              y_pred: torch.Tensor
               ) -> list[float]:
 
         dice_list = []
         for i in range(self._num_clases):
-            intersection = np.logical_and(y_true[:, i], y_pred[:, i]).sum()
-            dice_denominator = np.sum(y_true[:, 1]) + np.sum(y_pred[:, 1])
-            dice = (2 * intersection) / dice_denominator \
-                if dice_denominator != 0 else 1
-            dice_list.append(dice)
+            y_true_cls = y_true[:, i, :, :]
+            y_pred_cls = y_pred[:, i, :, :]
+
+            intersection = torch.sum(y_true_cls * y_pred_cls, dim=(1, 2))
+            dice_denominator = torch.sum(y_true_cls, dim=(1, 2)) + \
+                torch.sum(y_pred_cls, dim=(1, 2))
+
+            dice = (2 * intersection) / torch.clamp(dice_denominator, min=1e-6)
+            dice_list.append(dice.mean().item())
+
         return dice_list
 
     def _init_metric_for_epoch(self,

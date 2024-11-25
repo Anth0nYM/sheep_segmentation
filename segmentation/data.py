@@ -44,6 +44,7 @@ class SheepDataset(Dataset):
             transformed = self._transform(image=image, mask=mask)
             image, mask = transformed['image'], transformed['mask']
 
+        mask = mask.float() / 255.0  # type: ignore
         mask = mask.unsqueeze(0)  # type: ignore
         return image, mask
 
