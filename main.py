@@ -43,24 +43,24 @@ if __name__ == '__main__':
         train_run_dice = []
         model.train()
         train_samples = tqdm(train_dataloader)
+
         for image, mask in train_samples:
             image, mask = image.to(device), mask.to(device)
             optimizer.zero_grad()
             output = model(image)
+
             loss_1 = criterion_1(output, mask)
             loss_2 = criterion_2(output, mask)
-
-            iou, dice = metrics.run_metrics(yt=mask,
-                                            yp=output,
-                                            epoch=epoch,
-                                            split='train')
-
-            train_run_iou.append(iou)
-            train_run_dice.append(dice)
             loss = loss_1 + loss_2
             loss.backward()
             optimizer.step()
+
+            iou, dice = metrics.run_metrics(yt=mask, yp=output)
+
+            train_run_iou.append(iou)
+            train_run_dice.append(dice)
             train_run_loss.append(loss.item())
+
             desc = (f'Epoch: {epoch} '
                     f'Train Loss: {np.mean(train_run_loss):.4f} '
                     f'Train IOU: {np.mean(train_run_iou):.4f} '
@@ -68,8 +68,8 @@ if __name__ == '__main__':
 
             train_samples.set_description(desc=desc)
 
-        model.eval()
         with torch.no_grad():
+            model.eval()
             val_run_loss = []
             val_run_iou = []
             val_run_dice = []
@@ -80,10 +80,7 @@ if __name__ == '__main__':
                 eval_loss = criterion_1(output, mask) + \
                     criterion_2(output, mask)
 
-                iou, dice = metrics.run_metrics(yt=mask,
-                                                yp=output,
-                                                epoch=epoch,
-                                                split='val')
+                iou, dice = metrics.run_metrics(yt=mask, yp=output)
                 val_run_iou.append(iou)
                 val_run_dice.append(dice)
                 val_run_loss.append(eval_loss.item())
