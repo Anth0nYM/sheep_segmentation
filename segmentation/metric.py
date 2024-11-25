@@ -34,19 +34,31 @@ class MetricSegmentation:
         self._num_clases = num_clases
         self._tresh = tresh
         self._current_batch = 0
-        self._metric_images: dict[str, dict[np.ndarray, float]] = {
+        self._metric_images: dict = {
             'train': {},
             'val': {},
             'test': {}
         }
 
     def run_metrics(self,
-                    y_true: np.ndarray,
-                    y_pred: np.ndarray,
+                    yt: torch.Tensor,
+                    yp: torch.Tensor,
                     epoch: int,
                     split: str
-                    ) -> None:
-        return None
+                    ):
+
+        self._init_metric_for_epoch(epoch, split)
+        y_true = self._torch2np(yt)
+        y_pred = self._torch2np(yp)
+
+        self._metric_images[split][epoch].append(
+            ImageMetric(
+                self._iou(y_true, y_pred),
+                self._dice(y_true, y_pred),
+                self._current_batch))
+        last = self._metric_images[split][epoch][-1]
+
+        return last.iou_batch_mean(), last.dice_batch_mean()
 
     def _iou(self,
              y_true: np.ndarray,
@@ -75,11 +87,19 @@ class MetricSegmentation:
             dice_list.append(dice)
         return dice_list
 
-    def _init_metric_for_epoch(self) -> None:
-        return None
+    def _init_metric_for_epoch(self,
+                               epoch: int,
+                               split: str
+                               ) -> None:
+
+        if epoch not in self._metric_images.keys():
+            self._metric_images[split][epoch] = []
+            self._current_batch = 0
+        else:
+            self._current_batch += 1
 
     def _torch2np(self,
                   tensor: torch.Tensor
                   ) -> np.ndarray:
 
-        return tensor.detach().cpu().numpy()
+        return 1. * (tensor.detach().cpu().numpy() > self._tresh)
