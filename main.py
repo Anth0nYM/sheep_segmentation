@@ -6,9 +6,11 @@ import segmentation
 from tqdm import tqdm
 
 if __name__ == '__main__':
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'Using {device}')
+
     BATCH_SIZE = 8
+
     dataloader = segmentation.CustomDataLoader(
         batch_size=BATCH_SIZE,
         img_size=512,  # Unet use 512x512 images
@@ -33,6 +35,9 @@ if __name__ == '__main__':
                                                     mode='min',
                                                     patience=5)
 
+    log = segmentation.Log(batch_size=BATCH_SIZE, comment='Training UNet')
+    log.log_model(model, next(iter(train_dataloader))[0].to(device))
+
     epoch = 0
 
     while True:
@@ -41,7 +46,6 @@ if __name__ == '__main__':
         train_run_loss = []
         train_run_iou = []
         train_run_dice = []
-        model.train()
         train_samples = tqdm(train_dataloader)
 
         for image, mask in train_samples:
@@ -68,6 +72,24 @@ if __name__ == '__main__':
 
             train_samples.set_description(desc=desc)
 
+        log.log_scalar_train(scalar=np.mean(train_run_loss),
+                             epoch=epoch,
+                             scalar_name='Loss')
+
+        log.log_scalar_train(scalar=np.mean(train_run_iou),
+                             epoch=epoch,
+                             scalar_name='IOU')
+
+        log.log_scalar_train(scalar=np.mean(train_run_dice),
+                             epoch=epoch,
+                             scalar_name='Dice')
+
+        # Image log works only on last batch
+        log.log_tensors_train(image=image,
+                              mask=mask,
+                              output=output,
+                              epoch=epoch)
+
         with torch.no_grad():
             model.eval()
             val_run_loss = []
@@ -91,9 +113,27 @@ if __name__ == '__main__':
 
                 val_samples.set_description(desc=desc)
 
+            log.log_scalar_val(scalar=np.mean(val_run_loss),
+                               epoch=epoch,
+                               scalar_name='Loss')
+
+            log.log_scalar_val(scalar=np.mean(val_run_iou),
+                               epoch=epoch,
+                               scalar_name='IOU')
+
+            log.log_scalar_val(scalar=np.mean(val_run_dice),
+                               epoch=epoch,
+                               scalar_name='Dice')
+
+            # Only last batch too
+            log.log_tensors_val(image, mask, output, epoch)
+
             lr_sched.step(np.mean(val_run_loss))
             print(lr_sched.get_last_lr())
+
             es(np.mean(val_run_loss))
             if es.must_stop():
-                print('Early stopping')
+                print('Early stoped')
                 break
+
+    log.close()
