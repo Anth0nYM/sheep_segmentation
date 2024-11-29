@@ -80,7 +80,9 @@ class CustomDataLoader:
 
         train_transform = (
             A.Compose([
+                # TODO crop not resize
                 A.Resize(height=self._img_size, width=self._img_size),
+                # TODO modify in place
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()

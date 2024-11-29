@@ -9,10 +9,10 @@ class MetricSegmentation:
 
         self._threshold = threshold
         self._iou_metric = BinaryJaccardIndex(threshold=threshold).to(
-            "cuda" if torch.cuda.is_available() else "cpu"
+            device="cuda"
         )
         self._dice_metric = BinaryF1Score(threshold=threshold).to(
-            "cuda" if torch.cuda.is_available() else "cpu"
+            device="cuda"
         )
 
     def run_metrics(self,

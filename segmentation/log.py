@@ -117,9 +117,12 @@ class Log:
                         split: str
                         ) -> None:
 
+        # TODO DENORMALIZE IMAGE
         image = (image.detach().cpu() * 255).to(torch.uint8)
         mask = (mask.detach().cpu() * 255).to(torch.uint8)
+        mask = mask.repeat(1, 3, 1, 1)
         output = (output.detach().cpu() * 255).to(torch.uint8)
+        output = output.repeat(1, 3, 1, 1)
 
         images = torch.concat([image, mask, output], dim=0)
         self.log_images(images, epoch, path=f'tensors/{split}')
