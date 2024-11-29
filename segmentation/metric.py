@@ -1,6 +1,9 @@
 import torch
 from torchmetrics.classification import BinaryJaccardIndex, BinaryF1Score
 
+DEVICE = torch.device(device='cuda') if torch.cuda.is_available() else \
+        torch.device(device='cpu')
+
 
 class MetricSegmentation:
     def __init__(self,
@@ -9,10 +12,10 @@ class MetricSegmentation:
 
         self._threshold = threshold
         self._iou_metric = BinaryJaccardIndex(threshold=threshold).to(
-            device="cuda"
+            device=DEVICE
         )
         self._dice_metric = BinaryF1Score(threshold=threshold).to(
-            device="cuda"
+            device=DEVICE
         )
 
     def run_metrics(self,

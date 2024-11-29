@@ -127,6 +127,7 @@ class Log:
         images = torch.concat([image, mask, output], dim=0)
         self.log_images(images, epoch, path=f'tensors/{split}')
 
+    # Image log works only on last batch
     def log_tensors_train(self,
                           image: torch.Tensor,
                           mask: torch.Tensor,

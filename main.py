@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import segmentation
@@ -7,8 +6,10 @@ import segmentation_models_pytorch.losses as losses  # type: ignore
 from tqdm import tqdm
 
 if __name__ == '__main__':
-    DEVICE = torch.device(device='cuda')
+    DEVICE = torch.device(device='cuda') if torch.cuda.is_available() else \
+        torch.device(device='cpu')
     BATCH_SIZE = 8
+    MODEL_NAME = 'unet'
 
     dataloader = segmentation.CustomDataLoader(
         batch_size=BATCH_SIZE,
@@ -22,21 +23,21 @@ if __name__ == '__main__':
     val_dataloader = dataloader.get_val_dataloader()
     test_dataloader = dataloader.get_test_dataloader()
 
-    model = segmentation.Model(model_name='unet').to(device=DEVICE)
+    model = segmentation.Model(model_name=MODEL_NAME).to(device=DEVICE)
     metrics = segmentation.MetricSegmentation()
     es = segmentation.EarlyStoppingMonitor(patience=5)
 
-    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=True)
-    criterion_2 = losses.DiceLoss(mode='binary', from_logits=True)
+    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=False)
+    criterion_2 = losses.DiceLoss(mode='binary', from_logits=False)
 
     optimizer = optim.Adam(params=model.parameters(), lr=0.001)
 
     lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                                     mode='min',
                                                     patience=5,
-                                                    cooldown=5)
+                                                    cooldown=10)
 
-    log = segmentation.Log(batch_size=BATCH_SIZE, comment='Training UNet')
+    log = segmentation.Log(batch_size=BATCH_SIZE, comment=MODEL_NAME)
     log.log_model(model, next(iter(train_dataloader))[0].to(DEVICE))
 
     epoch = 0
@@ -85,7 +86,6 @@ if __name__ == '__main__':
                              epoch=epoch,
                              scalar_name='Dice')
 
-        # Image log works only on last batch
         log.log_tensors_train(image=image,
                               mask=mask,
                               output=output,
@@ -126,7 +126,6 @@ if __name__ == '__main__':
                                epoch=epoch,
                                scalar_name='Dice')
 
-            # Only last batch too
             log.log_tensors_val(image, mask, output, epoch)
 
             lr_sched.step(np.mean(val_run_loss))
