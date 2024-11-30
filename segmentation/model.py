@@ -20,19 +20,11 @@ class Model(nn.Module):
             'pan': smp.PAN,
         }
 
-        self.__aux_params = dict(
-            pooling='avg',
-            dropout=0.5,
-            activation='sigmoid',
-            classes=1,
-        )
-
         self.model = self.__models[model_name](
             encoder_name="resnet34",
             encoder_weights="imagenet",
             in_channels=3,
             classes=1,
-            aux_params=self.__aux_params
         )
 
         if model_name not in self.__models:

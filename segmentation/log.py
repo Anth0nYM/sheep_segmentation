@@ -55,7 +55,7 @@ class Log:
         self._model_saved = False
 
     def _log_scalar(self,
-                    scalar: float,
+                    scalar: np.floating,
                     epoch: int,
                     path: str,
                     mean: bool = True
@@ -66,7 +66,7 @@ class Log:
         self.writer.flush()
 
     def log_scalar_train(self,
-                         scalar: float,
+                         scalar: np.floating,
                          epoch: int,
                          scalar_name: str,
                          mean: bool = True
@@ -78,7 +78,7 @@ class Log:
                          mean=mean)
 
     def log_scalar_val(self,
-                       scalar: float,
+                       scalar: np.floating,
                        epoch: int,
                        scalar_name: str,
                        mean: bool = True
@@ -90,7 +90,7 @@ class Log:
                          mean=mean)
 
     def log_scalar_hiper(self,
-                         scalar: float,
+                         scalar: np.floating,
                          epoch: int,
                          scalar_name: str
                          ) -> None:

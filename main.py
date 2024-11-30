@@ -27,8 +27,8 @@ if __name__ == '__main__':
     metrics = segmentation.MetricSegmentation()
     es = segmentation.EarlyStoppingMonitor(patience=5)
 
-    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=False)
-    criterion_2 = losses.DiceLoss(mode='binary', from_logits=False)
+    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=True)
+    criterion_2 = losses.DiceLoss(mode='binary', from_logits=True)
 
     optimizer = optim.Adam(params=model.parameters(), lr=0.001)
 
@@ -46,45 +46,39 @@ if __name__ == '__main__':
         epoch += 1
         model.train()
         train_run_loss = []
-        train_run_iou = []
-        train_run_dice = []
+        train_metrics: dict[str, list[float]] = {
+            metric: [] for metric in metrics.metric_functions.keys()
+        }
         train_samples = tqdm(train_dataloader)
 
         for image, mask in train_samples:
             image, mask = image.to(DEVICE), mask.to(DEVICE)
             optimizer.zero_grad()
             output = model(image)
-
             loss_1 = criterion_1(output, mask)
             loss_2 = criterion_2(output, mask)
             loss = loss_1 + loss_2
             loss.backward()
             optimizer.step()
 
-            iou, dice = metrics.run_metrics(yt=mask, yp=output)
+            batch_metrics = metrics.run_metrics(yt=mask, yp=output)
+            for name, value in batch_metrics.items():
+                train_metrics[name].append(value)
 
-            train_run_iou.append(iou)
-            train_run_dice.append(dice)
             train_run_loss.append(loss.item())
 
             desc = (f'Epoch: {epoch} '
-                    f'Train Loss: {np.mean(train_run_loss):.4f} '
-                    f'Train IOU: {np.mean(train_run_iou):.4f} '
-                    f'Train Dice: {np.mean(train_run_dice):.4f}')
-
+                    f'Train Loss: {np.mean(train_run_loss):.4f} ')
             train_samples.set_description(desc=desc)
 
         log.log_scalar_train(scalar=np.mean(train_run_loss),
                              epoch=epoch,
                              scalar_name='Loss')
 
-        log.log_scalar_train(scalar=np.mean(train_run_iou),
-                             epoch=epoch,
-                             scalar_name='IOU')
-
-        log.log_scalar_train(scalar=np.mean(train_run_dice),
-                             epoch=epoch,
-                             scalar_name='Dice')
+        for name, values in train_metrics.items():
+            log.log_scalar_train(scalar=np.mean(values),
+                                 epoch=epoch,
+                                 scalar_name=name)
 
         log.log_tensors_train(image=image,
                               mask=mask,
@@ -94,8 +88,9 @@ if __name__ == '__main__':
         with torch.no_grad():
             model.eval()
             val_run_loss = []
-            val_run_iou = []
-            val_run_dice = []
+            val_metrics: dict[str, list[float]] = {
+                metric: [] for metric in metrics.metric_functions.keys()
+            }
             val_samples = tqdm(val_dataloader)
             for image, mask in val_samples:
                 image, mask = image.to(DEVICE), mask.to(DEVICE)
@@ -103,28 +98,23 @@ if __name__ == '__main__':
                 eval_loss = criterion_1(output, mask) + \
                     criterion_2(output, mask)
 
-                iou, dice = metrics.run_metrics(yt=mask, yp=output)
-                val_run_iou.append(iou)
-                val_run_dice.append(dice)
+                batch_metrics = metrics.run_metrics(yt=mask, yp=output)
+                for name, value in batch_metrics.items():
+                    val_metrics[name].append(value)
+
                 val_run_loss.append(eval_loss.item())
                 desc = (f'Epoch: {epoch} '
-                        f'Val Loss: {np.mean(val_run_loss):.4f} '
-                        f'Val IOU: {np.mean(val_run_iou):.4f} '
-                        f'Val Dice: {np.mean(val_run_dice):.4f}')
-
+                        f'Val Loss: {np.mean(val_run_loss):.4f} ')
                 val_samples.set_description(desc=desc)
 
             log.log_scalar_val(scalar=np.mean(val_run_loss),
                                epoch=epoch,
                                scalar_name='Loss')
 
-            log.log_scalar_val(scalar=np.mean(val_run_iou),
-                               epoch=epoch,
-                               scalar_name='IOU')
-
-            log.log_scalar_val(scalar=np.mean(val_run_dice),
-                               epoch=epoch,
-                               scalar_name='Dice')
+            for name, values in val_metrics.items():
+                log.log_scalar_val(scalar=np.mean(values),
+                                   epoch=epoch,
+                                   scalar_name=name)
 
             log.log_tensors_val(image, mask, output, epoch)
 
@@ -133,7 +123,7 @@ if __name__ == '__main__':
 
             es(np.mean(val_run_loss))
             if es.must_stop():
-                print('Early stoped')
+                print('Early stopped')
                 break
 
     log.close()
