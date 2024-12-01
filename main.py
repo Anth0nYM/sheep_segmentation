@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     dataloader = segmentation.CustomDataLoader(
         batch_size=BATCH_SIZE,
-        img_size=512,  # Unet use 512x512 images
+        img_size=(512, 512),  # Unet use 512x512 images
         subset_size=16,
         shuffle=True,
         augment=False,
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     epoch = 0
 
-    while True:
+    while epoch < 20:
         epoch += 1
         model.train()
         train_run_loss = []

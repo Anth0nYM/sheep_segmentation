@@ -116,18 +116,25 @@ class Log:
                         epoch: int,
                         split: str
                         ) -> None:
+        device = image.device
+        mean = torch.tensor([0.485, 0.456, 0.406],
+                            device=device).view(1, 3, 1, 1)
 
-        # TODO DENORMALIZE IMAGE
-        image = (image.detach().cpu() * 255).to(torch.uint8)
-        mask = (mask.detach().cpu() * 255).to(torch.uint8)
+        std = torch.tensor([0.229, 0.224, 0.225],
+                           device=device).view(1, 3, 1, 1)
+
+        image = (image * std + mean).clamp(0, 1)
+        image = (image * 255).to(torch.uint8)
+
+        mask = (mask * 255).to(torch.uint8).to(device)
         mask = mask.repeat(1, 3, 1, 1)
-        output = (output.detach().cpu() * 255).to(torch.uint8)
-        output = output.repeat(1, 3, 1, 1)
 
+        output = (output * 255).to(torch.uint8).to(device)
+        output = output.repeat(1, 3, 1, 1)
         images = torch.concat([image, mask, output], dim=0)
+
         self.log_images(images, epoch, path=f'tensors/{split}')
 
-    # Image log works only on last batch
     def log_tensors_train(self,
                           image: torch.Tensor,
                           mask: torch.Tensor,

@@ -2,10 +2,10 @@ import cv2
 import torch
 from glob import glob
 from torch.utils.data import Dataset, DataLoader, Subset, random_split
-from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from typing import Any, Optional, Callable, Union
+from typing import Any, Optional, Callable
+import os
 
 
 class SheepDataset(Dataset):
@@ -30,9 +30,11 @@ class SheepDataset(Dataset):
                     ) -> tuple[Any, Any]:
 
         image_path = self._img_paths[idx]
-        image_name = image_path[15:-4]
         mask_path = self._mask_paths[idx]
-        mask_name = mask_path[14:-12]
+
+        image_name = os.path.basename(image_path).split('.')[0]
+        mask_name = os.path.basename(mask_path).replace('_mascara',
+                                                        '').split('.')[0]
 
         if image_name != mask_name:
             raise ValueError(f'Name mismatch: {image_name}, {mask_name}')
@@ -53,7 +55,7 @@ class CustomDataLoader:
     def __init__(self,
                  batch_size: int,
                  shuffle: bool,
-                 img_size: int,
+                 img_size: tuple[int, int],
                  subset_size: Optional[int] = None,
                  seed: int = 0,
                  augment: bool = False,
@@ -66,7 +68,6 @@ class CustomDataLoader:
         self._seed = seed
         self._augment = augment
         self._dir_path = 'dataset'
-
         self._transform = self._get_transforms()
         self._dataset = SheepDataset(
             dir_path=self._dir_path,
@@ -78,16 +79,16 @@ class CustomDataLoader:
                         proba: float = 0.5
                         ) -> dict[str, A.Compose]:
 
+        img_h, img_w = self._img_size
         train_transform = (
             A.Compose([
-                # TODO crop not resize
-                A.Resize(height=self._img_size, width=self._img_size),
-                # TODO modify in place
+                A.Resize(height=img_h, width=img_w),
+                A.RandomRotate90(p=proba),
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
             ]) if self._augment else A.Compose([
-                A.Resize(height=self._img_size, width=self._img_size),
+                A.Resize(height=img_h, width=img_w),
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
@@ -95,8 +96,9 @@ class CustomDataLoader:
         )
 
         val_test_transform = A.Compose([
-            A.Resize(height=self._img_size, width=self._img_size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            A.Resize(height=img_h, width=img_w),
+            A.Normalize(mean=(0.485, 0.456, 0.406),
+                        std=(0.229, 0.224, 0.225)),
             ToTensorV2()
         ])
 
@@ -121,7 +123,7 @@ class CustomDataLoader:
 
     def _create_dataloader(self,
                            subset: Dataset
-                           ) -> Union[DataLoader, tqdm]:
+                           ) -> DataLoader:
 
         if self._subset_size:
             subset = Subset(subset, list(range(self._subset_size)))
@@ -134,11 +136,11 @@ class CustomDataLoader:
 
         return dataloader
 
-    def get_train_dataloader(self) -> Union[DataLoader, tqdm]:
+    def get_train_dataloader(self) -> DataLoader:
         return self._create_dataloader(self._train_set)
 
-    def get_val_dataloader(self) -> Union[DataLoader, tqdm]:
+    def get_val_dataloader(self) -> DataLoader:
         return self._create_dataloader(self._val_set)
 
-    def get_test_dataloader(self) -> Union[DataLoader, tqdm]:
+    def get_test_dataloader(self) -> DataLoader:
         return self._create_dataloader(self._test_set)
