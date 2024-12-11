@@ -31,4 +31,7 @@ class Model(nn.Module):
             raise ValueError(f"Model not found: {model_name}")
 
     def forward(self, x) -> Any:
+        h, w = x.shape[2:]
+        assert h % 32 == 0 and w % 32 == 0, \
+            "Input dimensions must be divisible by 32"
         return self.model(x)

@@ -176,3 +176,9 @@ class Log:
         self.writer.add_embedding(features,
                                   metadata=class_labels,
                                   label_img=labels)
+
+    def log_data_augmentation(self, augment: bool) -> None:
+        augment_status = "enabled" if augment else "disabled"
+        self.writer.add_text("Data Augmentation",
+                             f"Data augmentation is {augment_status}")
+        self.writer.flush()

@@ -8,13 +8,12 @@ from tqdm import tqdm
 if __name__ == '__main__':
     DEVICE = torch.device(device='cuda') if torch.cuda.is_available() else \
         torch.device(device='cpu')
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
     MODEL_NAME = 'unet'
 
     dataloader = segmentation.CustomDataLoader(
         batch_size=BATCH_SIZE,
         img_size=(512, 512),  # Unet use 512x512 images
-        subset_size=16,
         shuffle=True,
         augment=False,
     )
@@ -39,6 +38,7 @@ if __name__ == '__main__':
 
     log = segmentation.Log(batch_size=BATCH_SIZE, comment=MODEL_NAME)
     log.log_model(model, next(iter(train_dataloader))[0].to(DEVICE))
+    log.log_data_augmentation(augment=dataloader.is_augmented)
 
     epoch = 0
 

@@ -74,16 +74,18 @@ class CustomDataLoader:
             transform=self._transform['train']
         )
         self._train_set, self._val_set, self._test_set = self._split_dataset()
+        self.is_augmented = True if augment else False
 
     def _get_transforms(self,
                         proba: float = 0.5
                         ) -> dict[str, A.Compose]:
 
         img_h, img_w = self._img_size
+        img_h = (img_h // 32) * 32
+        img_w = (img_w // 32) * 32
         train_transform = (
             A.Compose([
                 A.Resize(height=img_h, width=img_w),
-                A.RandomRotate90(p=proba),
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
