@@ -19,12 +19,13 @@ class Model(nn.Module):
             'manet': smp.MAnet,
             'pan': smp.PAN,
         }
-
+        # TODO: add sigmoid here
         self.model = self.__models[model_name](
             encoder_name="resnet34",
             encoder_weights="imagenet",
             in_channels=3,
             classes=1,
+            activation="sigmoid"
         )
 
         if model_name not in self.__models:

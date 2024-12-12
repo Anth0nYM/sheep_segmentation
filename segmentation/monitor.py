@@ -20,3 +20,5 @@ class EarlyStoppingMonitor:
 
     def must_stop(self):
         return self.stop_training
+
+# TODO: RETORNAR self.wait = 0 e logar

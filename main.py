@@ -26,15 +26,15 @@ if __name__ == '__main__':
     metrics = segmentation.MetricSegmentation()
     es = segmentation.EarlyStoppingMonitor(patience=5)
 
-    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=True)
-    criterion_2 = losses.DiceLoss(mode='binary', from_logits=True)
+    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=False)
+    criterion_2 = losses.DiceLoss(mode='binary', from_logits=False)
 
     optimizer = optim.Adam(params=model.parameters(), lr=0.001)
 
     lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                                     mode='min',
                                                     patience=5,
-                                                    cooldown=10)
+                                                    cooldown=5)
 
     log = segmentation.Log(batch_size=BATCH_SIZE, comment=MODEL_NAME)
     log.log_model(model, next(iter(train_dataloader))[0].to(DEVICE))
