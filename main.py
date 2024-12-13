@@ -15,6 +15,7 @@ if __name__ == '__main__':
         batch_size=BATCH_SIZE,
         img_size=(512, 512),  # Unet use 512x512 images
         shuffle=True,
+        subset_size=30,
         augment=False,
     )
 
@@ -121,9 +122,47 @@ if __name__ == '__main__':
             lr_sched.step(np.mean(val_run_loss))
             print(lr_sched.get_last_lr())
 
+            wait = es(np.mean(val_run_loss))
+            log.log_scalar_hiper(scalar=wait,
+                                 epoch=epoch,
+                                 scalar_name="EarlyStoppingWait")
+
             es(np.mean(val_run_loss))
             if es.must_stop():
                 print('Early stopped')
                 break
+
+    with torch.no_grad():
+        model.eval()
+        test_run_loss = []
+        test_metrics: dict[str, list[float]] = {
+            metric: [] for metric in metrics.metric_functions.keys()
+        }
+        test_samples = tqdm(test_dataloader, desc="Testing")
+        for image, mask in test_samples:
+            image, mask = image.to(DEVICE), mask.to(DEVICE)
+            output = model(image)
+
+            test_loss = criterion_1(output, mask) + criterion_2(output, mask)
+            test_run_loss.append(test_loss.item())
+
+            batch_metrics = metrics.run_metrics(yt=mask, yp=output)
+            for name, value in batch_metrics.items():
+                test_metrics[name].append(value)
+
+            test_samples.set_description(
+                f"Test Loss: {np.mean(test_run_loss):.4f}"
+            )
+
+        log.log_scalar_val(scalar=np.mean(test_run_loss),
+                           epoch=epoch,
+                           scalar_name='Loss/Test')
+
+        for name, values in test_metrics.items():
+            log.log_scalar_val(scalar=np.mean(values),
+                               epoch=epoch,
+                               scalar_name=f"Metric/{name}/Test")
+
+        log.log_tensors_val(image=image, mask=mask, output=output, epoch=epoch)
 
     log.close()

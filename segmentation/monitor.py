@@ -18,7 +18,7 @@ class EarlyStoppingMonitor:
             self.best_loss = loss
             self.wait = 0
 
+        return self.wait
+
     def must_stop(self):
         return self.stop_training
-
-# TODO: RETORNAR self.wait = 0 e logar
