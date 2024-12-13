@@ -77,7 +77,7 @@ class CustomDataLoader:
         self.is_augmented = True if augment else False
 
     def _get_transforms(self,
-                        proba: float = 0.5
+                        p: float = 0.067
                         ) -> dict[str, A.Compose]:
 
         img_h, img_w = self._img_size
@@ -85,20 +85,41 @@ class CustomDataLoader:
         img_w = (img_w // 32) * 32
         train_transform = (
             A.Compose([
-                A.Resize(height=img_h, width=img_w),
+                A.CLAHE(p=p),
+                A.RandomBrightnessContrast(p=p),
+                A.Blur(p=p),
+                A.HueSaturationValue(p=p),
+                # Geometric
+                A.HorizontalFlip(p=p),
+                A.VerticalFlip(p=p),
+                A.RandomRotate90(p=p),
+                A.Transpose(p=p),
+                A.ShiftScaleRotate(
+                    shift_limit=0.0625,
+                    scale_limit=0.2,
+                    rotate_limit=45,
+                    p=p
+                    ),
+                A.Perspective(
+                    scale=(0.05, 0.1),  # Grau de distorção da perspectiva
+                    keep_size=True,      # Mantém o tamanho da imagem original
+                    p=p
+                    ),
+                # Pré-processamento padrão
+                A.RandomCrop(height=img_h, width=img_w),
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
-            ]) if self._augment else A.Compose([
-                A.Resize(height=img_h, width=img_w),
-                A.Normalize(mean=(0.485, 0.456, 0.406),
-                            std=(0.229, 0.224, 0.225)),
-                ToTensorV2()
-            ])
-        )
+                ]) if self._augment else A.Compose([
+                    A.RandomCrop(height=img_h, width=img_w),
+                    A.Normalize(mean=(0.485, 0.456, 0.406),
+                                std=(0.229, 0.224, 0.225)),
+                    ToTensorV2()
+                    ])
+                )
 
         val_test_transform = A.Compose([
-            A.Resize(height=img_h, width=img_w),
+            A.RandomCrop(height=img_h, width=img_w),
             A.Normalize(mean=(0.485, 0.456, 0.406),
                         std=(0.229, 0.224, 0.225)),
             ToTensorV2()
