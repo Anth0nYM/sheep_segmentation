@@ -85,6 +85,7 @@ class CustomDataLoader:
         img_w = (img_w // 32) * 32
         train_transform = (
             A.Compose([
+                A.Resize(height=img_h, width=img_w),
                 A.CLAHE(p=p),
                 A.RandomBrightnessContrast(p=p),
                 A.Blur(p=p),
@@ -106,12 +107,12 @@ class CustomDataLoader:
                     p=p
                     ),
                 # Pré-processamento padrão
-                A.RandomCrop(height=img_h, width=img_w),
+                A.Resize(height=img_h, width=img_w),
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
                 ]) if self._augment else A.Compose([
-                    A.RandomCrop(height=img_h, width=img_w),
+                    A.Resize(height=img_h, width=img_w),
                     A.Normalize(mean=(0.485, 0.456, 0.406),
                                 std=(0.229, 0.224, 0.225)),
                     ToTensorV2()
@@ -119,7 +120,7 @@ class CustomDataLoader:
                 )
 
         val_test_transform = A.Compose([
-            A.RandomCrop(height=img_h, width=img_w),
+            A.Resize(height=img_h, width=img_w),
             A.Normalize(mean=(0.485, 0.456, 0.406),
                         std=(0.229, 0.224, 0.225)),
             ToTensorV2()

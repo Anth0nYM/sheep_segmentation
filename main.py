@@ -15,7 +15,7 @@ if __name__ == '__main__':
         batch_size=BATCH_SIZE,
         img_size=(512, 512),  # Unet use 512x512 images
         shuffle=True,
-        subset_size=30,
+        # subset_size=30,
         augment=False,
     )
 
@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     model = segmentation.Model(model_name=MODEL_NAME).to(device=DEVICE)
     metrics = segmentation.MetricSegmentation()
-    es = segmentation.EarlyStoppingMonitor(patience=5)
+    es = segmentation.EarlyStoppingMonitor(patience=10)
 
     criterion_1 = losses.JaccardLoss(mode='binary', from_logits=False)
     criterion_2 = losses.DiceLoss(mode='binary', from_logits=False)
@@ -120,7 +120,6 @@ if __name__ == '__main__':
             log.log_tensors_val(image, mask, output, epoch)
 
             lr_sched.step(np.mean(val_run_loss))
-            print(lr_sched.get_last_lr())
 
             wait = es(np.mean(val_run_loss))
             log.log_scalar_hiper(scalar=wait,
@@ -155,7 +154,7 @@ if __name__ == '__main__':
             )
 
         log.log_scalar_val(scalar=np.mean(test_run_loss),
-                           epoch=epoch,
+                           epoch=epoch + 1,
                            scalar_name='Loss/Test')
 
         for name, values in test_metrics.items():
