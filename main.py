@@ -15,7 +15,7 @@ if __name__ == '__main__':
         batch_size=BATCH_SIZE,
         img_size=(512, 512),  # Unet use 512x512 images
         shuffle=True,
-        # subset_size=30,
+        subset_size=30,
         augment=False,
     )
 
@@ -32,10 +32,9 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(params=model.parameters(), lr=0.001)
 
-    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
-                                                    mode='min',
-                                                    patience=5,
-                                                    cooldown=5)
+    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer=optimizer, mode='min', patience=5, cooldown=5
+    )
 
     log = segmentation.Log(batch_size=BATCH_SIZE, comment=MODEL_NAME)
     log.log_model(model, next(iter(train_dataloader))[0].to(DEVICE))
@@ -47,7 +46,7 @@ if __name__ == '__main__':
         epoch += 1
         model.train()
         train_run_loss = []
-        train_metrics: dict[str, list[float]] = {
+        train_metrics: dict = {
             metric: [] for metric in metrics.metric_functions.keys()
         }
         train_samples = tqdm(train_dataloader)
@@ -56,9 +55,7 @@ if __name__ == '__main__':
             image, mask = image.to(DEVICE), mask.to(DEVICE)
             optimizer.zero_grad()
             output = model(image)
-            loss_1 = criterion_1(output, mask)
-            loss_2 = criterion_2(output, mask)
-            loss = loss_1 + loss_2
+            loss = criterion_1(output, mask) + criterion_2(output, mask)
             loss.backward()
             optimizer.step()
 
@@ -67,32 +64,34 @@ if __name__ == '__main__':
                 train_metrics[name].append(value)
 
             train_run_loss.append(loss.item())
-
-            desc = (f'Epoch: {epoch} '
-                    f'Train Loss: {np.mean(train_run_loss):.4f} ')
+            desc = f"Epoch: {epoch} Train Loss: {np.mean(train_run_loss):.4f}"
             train_samples.set_description(desc=desc)
 
-        log.log_scalar_train(scalar=np.mean(train_run_loss),
-                             epoch=epoch,
-                             scalar_name='Loss')
+        # Logging de treino
+        log.log_scalar(scalar=np.mean(train_run_loss), epoch=epoch,
+                       scalar_name="Loss", split="Train")
 
         for name, values in train_metrics.items():
-            log.log_scalar_train(scalar=np.mean(values),
-                                 epoch=epoch,
-                                 scalar_name=name)
+            log.log_scalar(scalar=np.mean(values),
+                           epoch=epoch,
+                           scalar_name=name,
+                           split="Train")
 
-        log.log_tensors_train(image=image,
-                              mask=mask,
-                              output=output,
-                              epoch=epoch)
+        log.log_tensors(image=image,
+                        mask=mask,
+                        output=output,
+                        epoch=epoch,
+                        split="Train")
 
+        # Validação
         with torch.no_grad():
             model.eval()
             val_run_loss = []
-            val_metrics: dict[str, list[float]] = {
+            val_metrics: dict = {
                 metric: [] for metric in metrics.metric_functions.keys()
             }
             val_samples = tqdm(val_dataloader)
+
             for image, mask in val_samples:
                 image, mask = image.to(DEVICE), mask.to(DEVICE)
                 output = model(image)
@@ -104,64 +103,64 @@ if __name__ == '__main__':
                     val_metrics[name].append(value)
 
                 val_run_loss.append(eval_loss.item())
-                desc = (f'Epoch: {epoch} '
-                        f'Val Loss: {np.mean(val_run_loss):.4f} ')
+                desc = f"Epoch: {epoch} Val Loss: {np.mean(val_run_loss):.4f}"
                 val_samples.set_description(desc=desc)
 
-            log.log_scalar_val(scalar=np.mean(val_run_loss),
-                               epoch=epoch,
-                               scalar_name='Loss')
+            # Logging de validação
+            log.log_scalar(scalar=np.mean(val_run_loss),
+                           epoch=epoch,
+                           scalar_name="Loss",
+                           split="Val")
 
             for name, values in val_metrics.items():
-                log.log_scalar_val(scalar=np.mean(values),
-                                   epoch=epoch,
-                                   scalar_name=name)
+                log.log_scalar(scalar=np.mean(values),
+                               epoch=epoch,
+                               scalar_name=name,
+                               split="Val")
 
-            log.log_tensors_val(image, mask, output, epoch)
+            log.log_tensors(image=image,
+                            mask=mask,
+                            output=output,
+                            epoch=epoch,
+                            split="Val")
 
+            # Early stopping e ajuste de LR
             lr_sched.step(np.mean(val_run_loss))
-
             wait = es(np.mean(val_run_loss))
-            log.log_scalar_hiper(scalar=wait,
-                                 epoch=epoch,
-                                 scalar_name="EarlyStoppingWait")
+            log.log_scalar(scalar=wait, epoch=epoch,
+                           scalar_name="EarlyStoppingWait",
+                           split="HIPER")
 
-            es(np.mean(val_run_loss))
             if es.must_stop():
-                print('Early stopped')
+                print("Early stopped")
                 break
 
+    # Teste
     with torch.no_grad():
         model.eval()
-        test_run_loss = []
-        test_metrics: dict[str, list[float]] = {
+        test_metrics: dict = {
             metric: [] for metric in metrics.metric_functions.keys()
         }
-        test_samples = tqdm(test_dataloader, desc="Testing")
+        test_samples = tqdm(test_dataloader)
+
         for image, mask in test_samples:
             image, mask = image.to(DEVICE), mask.to(DEVICE)
             output = model(image)
-
-            test_loss = criterion_1(output, mask) + criterion_2(output, mask)
-            test_run_loss.append(test_loss.item())
 
             batch_metrics = metrics.run_metrics(yt=mask, yp=output)
             for name, value in batch_metrics.items():
                 test_metrics[name].append(value)
 
-            test_samples.set_description(
-                f"Test Loss: {np.mean(test_run_loss):.4f}"
-            )
-
-        log.log_scalar_val(scalar=np.mean(test_run_loss),
-                           epoch=epoch + 1,
-                           scalar_name='Loss/Test')
+            log.log_tensors(image=image,
+                            mask=mask,
+                            output=output,
+                            epoch=epoch,
+                            split="Test")
 
         for name, values in test_metrics.items():
-            log.log_scalar_val(scalar=np.mean(values),
-                               epoch=epoch,
-                               scalar_name=f"Metric/{name}/Test")
-
-        log.log_tensors_val(image=image, mask=mask, output=output, epoch=epoch)
+            log.log_scalar(scalar=np.mean(values),
+                           epoch=epoch,
+                           scalar_name=name,
+                           split="Test")
 
     log.close()

@@ -4,15 +4,12 @@ import git
 import datetime
 import numpy as np
 import torch
-from typing import Optional, Union
+from typing import Union
 
 
 class Git:
-    def __init__(self,
-                 repot_path: str
-                 ) -> None:
-
-        self._repo = git.Repo(repot_path)
+    def __init__(self, repo_path: str) -> None:
+        self._repo = git.Repo(repo_path)
         self._sha = self._repo.head.object.hexsha[:8]
         self._date = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self._commit = self._repo.head.commit
@@ -29,29 +26,27 @@ class Git:
         if isinstance(commit_message, bytes):
             commit_message = commit_message.decode()
 
-        return (f'Author: {author},'
-                f'Date: {self._commit.committed_datetime},'
-                f'Message: {commit_message}')
+        return (f"Author: {author}, Date: {self._commit.committed_datetime}, "
+                f"Message: {commit_message}")
 
 
 class Log:
-    def __init__(self,
-                 batch_size: int,
+    def __init__(self, batch_size: int,
                  comment: str = '',
                  path: str = 'runs/'
                  ) -> None:
 
-        self._git = Git(repot_path='.')
+        self._git = Git(repo_path='.')
         self._batch_size = batch_size
-        log_dir = (f'{path}{self._git.get_hex()}_{self._git.timestamp()}_'
-                   f'{comment}')
-
-        comment = f'{self._git.get_details()}'
-        filename_suffix = f'{self._git.timestamp()}'
-        self.writer = SummaryWriter(log_dir=log_dir,
-                                    comment=comment,
-                                    filename_suffix=filename_suffix)
-
+        log_dir = (f"{path}{self._git.get_hex()}_{self._git.timestamp()}_"
+                   f"{comment}")
+        comment_details = self._git.get_details()
+        filename_suffix = self._git.timestamp()
+        self.writer = SummaryWriter(
+            log_dir=log_dir,
+            comment=comment_details,
+            filename_suffix=filename_suffix
+        )
         self._model_saved = False
 
     def _log_scalar(self,
@@ -61,61 +56,44 @@ class Log:
                     mean: bool = True
                     ) -> None:
 
-        self.writer.add_scalar(path,
-                               np.mean(scalar) if mean else scalar, epoch)
+        self.writer.add_scalar(
+            path, np.mean(scalar) if mean else scalar, epoch
+        )
         self.writer.flush()
 
-    def log_scalar_train(self,
-                         scalar: np.floating,
-                         epoch: int,
-                         scalar_name: str,
-                         mean: bool = True
-                         ) -> None:
-
+    def log_scalar(self,
+                   scalar: np.floating,
+                   epoch: int,
+                   scalar_name: str,
+                   split: str,
+                   mean: bool = True
+                   ) -> None:
+        """
+        Logs a scalar value for the specified split (Train, Val, Test, etc.).
+        """
         self._log_scalar(scalar=scalar,
                          epoch=epoch,
-                         path=f'{scalar_name}/Train',
-                         mean=mean)
-
-    def log_scalar_val(self,
-                       scalar: np.floating,
-                       epoch: int,
-                       scalar_name: str,
-                       mean: bool = True
-                       ) -> None:
-
-        self._log_scalar(scalar=scalar,
-                         epoch=epoch,
-                         path=f'{scalar_name}/Val',
-                         mean=mean)
-
-    def log_scalar_hiper(self,
-                         scalar: np.floating,
-                         epoch: int,
-                         scalar_name: str
-                         ) -> None:
-
-        self._log_scalar(scalar=scalar,
-                         epoch=epoch,
-                         path=f'HIPER/{scalar_name}',
-                         mean=False)
+                         path=f"{scalar_name}/{split}", mean=mean)
 
     def log_images(self,
                    images: torch.Tensor,
                    epoch: int,
-                   path: Optional[str] = None
+                   split: str
                    ) -> None:
-
+        """
+        Logs a grid of images for the specified split (Train, Val, Test, etc.).
+        """
         img_grid = make_grid(images, nrow=self._batch_size)
-        self.writer.add_image(path, img_grid, global_step=epoch)
+        self.writer.add_image(f"tensors/{split}", img_grid, global_step=epoch)
 
     def rescale_tensors(self,
                         image: torch.Tensor,
                         mask: torch.Tensor,
-                        output: torch.Tensor,
-                        epoch: int,
-                        split: str
-                        ) -> None:
+                        output: torch.Tensor
+                        ) -> torch.Tensor:
+        """
+        Rescales tensors to uint8 for visualization in TensorBoard.
+        """
         device = image.device
         mean = torch.tensor([0.485, 0.456, 0.406],
                             device=device).view(1, 3, 1, 1)
@@ -131,27 +109,19 @@ class Log:
 
         output = (output * 255).to(torch.uint8).to(device)
         output = output.repeat(1, 3, 1, 1)
-        images = torch.concat([image, mask, output], dim=0)
 
-        self.log_images(images, epoch, path=f'tensors/{split}')
+        return torch.concat([image, mask, output], dim=0)
 
-    def log_tensors_train(self,
-                          image: torch.Tensor,
-                          mask: torch.Tensor,
-                          output: torch.Tensor,
-                          epoch: int
-                          ) -> None:
-
-        self.rescale_tensors(image, mask, output, epoch, 'train')
-
-    def log_tensors_val(self,
-                        image: torch.Tensor,
-                        mask: torch.Tensor,
-                        output: torch.Tensor,
-                        epoch: int
-                        ) -> None:
-
-        self.rescale_tensors(image, mask, output, epoch, 'val')
+    def log_tensors(self, image: torch.Tensor,
+                    mask: torch.Tensor,
+                    output: torch.Tensor,
+                    epoch: int, split: str
+                    ) -> None:
+        """
+        Logs tensors (images, masks, and outputs) for the specified split.
+        """
+        images = self.rescale_tensors(image, mask, output)
+        self.log_images(images, epoch, split)
 
     def close(self) -> None:
         self.writer.close()
@@ -161,9 +131,11 @@ class Log:
                   images_input: torch.Tensor,
                   forced_log: bool = False
                   ) -> None:
-
+        """
+        Logs the model architecture.
+        """
         if not self._model_saved or forced_log:
-            print('Log Model')
+            print("Log Model")
             self.writer.add_graph(model, images_input)
             self._model_saved = True
 
@@ -172,13 +144,21 @@ class Log:
                       class_labels: Union[list[str], torch.Tensor],
                       labels: torch.Tensor
                       ) -> None:
-
+        """
+        Logs embeddings.
+        """
         self.writer.add_embedding(features,
                                   metadata=class_labels,
                                   label_img=labels)
 
-    def log_data_augmentation(self, augment: bool) -> None:
+    def log_data_augmentation(self,
+                              augment: bool
+                              ) -> None:
+        """
+        Logs the status of data augmentation.
+        """
         augment_status = "enabled" if augment else "disabled"
-        self.writer.add_text("Data Augmentation",
-                             f"Data augmentation is {augment_status}")
+        self.writer.add_text(
+            "Data Augmentation", f"Data augmentation is {augment_status}"
+        )
         self.writer.flush()
