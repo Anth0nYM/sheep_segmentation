@@ -15,7 +15,7 @@ if __name__ == '__main__':
         batch_size=BATCH_SIZE,
         img_size=(512, 512),  # Unet use 512x512 images
         shuffle=True,
-        subset_size=30,
+        # subset_size=10,
         augment=False,
     )
 
@@ -158,9 +158,6 @@ if __name__ == '__main__':
                             split="Test")
 
         for name, values in test_metrics.items():
-            log.log_scalar(scalar=np.mean(values),
-                           epoch=epoch,
-                           scalar_name=name,
-                           split="Test")
+            print(f"Test {name}: {np.mean(values):.4f}")
 
     log.close()
