@@ -142,6 +142,7 @@ if __name__ == '__main__':
             metric: [] for metric in metrics.metric_functions.keys()
         }
         test_samples = tqdm(test_dataloader)
+        logged_image = False
 
         for image, mask in test_samples:
             image, mask = image.to(DEVICE), mask.to(DEVICE)
@@ -151,13 +152,20 @@ if __name__ == '__main__':
             for name, value in batch_metrics.items():
                 test_metrics[name].append(value)
 
-            log.log_tensors(image=image,
-                            mask=mask,
-                            output=output,
-                            epoch=epoch,
-                            split="Test")
+            if not logged_image:
+                log.log_tensors(image=image,
+                                mask=mask,
+                                output=output,
+                                epoch=epoch,
+                                split="Test")
+                logged_image = True
 
         for name, values in test_metrics.items():
+            log.log_scalar(scalar=np.mean(values),
+                           epoch=epoch,
+                           scalar_name=name,
+                           split="Test")
+
             print(f"Test {name}: {np.mean(values):.4f}")
 
     log.close()
