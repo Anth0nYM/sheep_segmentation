@@ -16,7 +16,7 @@ if __name__ == '__main__':
         img_size=(512, 512),  # Unet use 512x512 images
         shuffle=True,
         # subset_size=10,
-        augment=False,
+        augment=True,
     )
 
     train_dataloader = dataloader.get_train_dataloader()
