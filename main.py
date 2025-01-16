@@ -12,10 +12,20 @@ if __name__ == '__main__':
         if torch.cuda.is_available()\
         else torch.device(device='cpu')
     print(f"Using {DEVICE} as device")
+    # models:
+    # 'unet',
+    # 'unetplusplus',
+    # 'fnp',
+    # 'pspnet',
+    # 'deeplabv3',
+    # 'deeplabv3plus',
+    # 'linknet',
+    # 'manet',
+    # 'pan'
 
     PATH = "dataset/will"
     K = 5
-    BATCH_SIZE = 32
+    BATCH_SIZE = 32  # for 512 batch = 16 for 256 batch = 32
     IMAGE_SIZE = 256, 256
     MODEL_NAME = 'unet'
     EPOCH_LIMIT = 100
@@ -29,7 +39,10 @@ if __name__ == '__main__':
     if DEVICE == torch.device(device='cuda'):
         torch.cuda.manual_seed_all(seed=SEED)
 
-    logger = src.Log(k_folds=K, comment="unet_bsz32")
+    logger = src.Log(
+        k_folds=K,
+        comment=f"{MODEL_NAME}{IMAGE_SIZE[0]}_aug{AUGMENT}"
+    )
 
     dataset = src.SheepsDataset(path=PATH,
                                 to_augment=False,

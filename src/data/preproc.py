@@ -16,10 +16,9 @@ def preproc(img, mask, weight, to_augment, img_size) -> tuple:
 
 def augment(img, mask):
     transform = A.Compose([
-        A.HorizontalFlip(p=0.5),
+        A.HorizontalFlip(p=0.25),
         A.RandomBrightnessContrast(brightness_limit=(0.8, 1.2),
-                                   contrast_limit=0,
-                                   p=0.5)
+                                   p=0.25)
     ])
 
     augmented = transform(image=img, mask=mask)

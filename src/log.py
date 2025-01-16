@@ -100,12 +100,19 @@ class Log:
 
         writer = self.__writers[f"fold_{fold + 1}"]
 
-        # Normaliza tensores para visualização
+        # Seleciona aleatoriamente `n_images` índices
         max_images = min(images.size(0), n_images)
-        images = images[:max_images]
-        true_masks = true_masks[:max_images]
-        pred_masks = pred_masks[:max_images]
+        random_indices = torch.randperm(images.size(0))[:max_images]
 
+        # Seleciona amostras aleatórias com base nos índices
+        images = images[random_indices]
+        true_masks = true_masks[random_indices]
+        pred_masks = pred_masks[random_indices]
+        animal_ids = animal_ids[random_indices]
+        true_weights = true_weights[random_indices]
+        pred_weights = pred_weights[random_indices]
+
+        # Normaliza tensores para visualização
         true_masks = true_masks.repeat(1, 3, 1, 1)
 
         pred_masks = pred_masks.repeat(1, 3, 1, 1)
