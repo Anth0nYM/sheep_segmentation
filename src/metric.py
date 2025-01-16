@@ -22,8 +22,6 @@ class MetricsReport:
             self.metric_functions = {
                 "MAE": m.mean_absolute_error,
                 "RMSE": m.mean_squared_error,
-                "R2 Score": m.r2_score,
-                "R Score": m.pearson_corrcoef
             }
         else:
             raise ValueError("task must be 'segmentation' or 'regression'")

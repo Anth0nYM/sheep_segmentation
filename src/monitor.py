@@ -4,7 +4,7 @@ from typing import Optional
 class EarlyStoppingMonitor:
     def __init__(self,
                  patience: int = 10,
-                 min_delta: float = 1e-4
+                 min_delta: float = 1e-5
                  ) -> None:
 
         self.__patience = patience
