@@ -46,7 +46,7 @@ class Log:
             defaultdict(lambda: {"train": {}, "val": {}})
 
         self.__log_dir = (
-            f"{path}{self.__git.get_hex()}_{self.__git.timestamp()}_{comment}"
+            f"{path}{self.__git.get_hex()}_{comment}_{self.__git.timestamp()}"
         )
 
         self.__writers = {
