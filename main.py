@@ -1,171 +1,237 @@
 import torch
+import src
 import torch.optim as optim
-import numpy as np
-import segmentation
-import segmentation_models_pytorch.losses as losses  # type: ignore
+import torch.nn as nn
+import segmentation_models_pytorch.losses as losses
 from tqdm import tqdm
+import numpy as np
+from sklearn.model_selection import GroupKFold
 
 if __name__ == '__main__':
-    DEVICE = torch.device(device='cuda') if torch.cuda.is_available() else \
-        torch.device(device='cpu')
-    BATCH_SIZE = 16
+    DEVICE = torch.device(device='cuda')\
+        if torch.cuda.is_available()\
+        else torch.device(device='cpu')
+    print(f"Using {DEVICE} as device")
+
+    PATH = "dataset/will"
+    K = 5
+    BATCH_SIZE = 32
+    IMAGE_SIZE = 256, 256
     MODEL_NAME = 'unet'
+    EPOCH_LIMIT = 100
+    AUGMENT = False
+    LAMBDA_SEG = 1.0
+    LAMBDA_REG = 1.0
+    SEED = 0
 
-    dataloader = segmentation.CustomDataLoader(
-        batch_size=BATCH_SIZE,
-        img_size=(512, 512),  # Unet use 512x512 images
-        shuffle=True,
-        # subset_size=10,
-        augment=True,
-    )
+    torch.manual_seed(seed=SEED)
+    np.random.seed(seed=SEED)
+    if DEVICE == torch.device(device='cuda'):
+        torch.cuda.manual_seed_all(seed=SEED)
 
-    train_dataloader = dataloader.get_train_dataloader()
-    val_dataloader = dataloader.get_val_dataloader()
-    test_dataloader = dataloader.get_test_dataloader()
+    logger = src.Log(k_folds=K)
 
-    model = segmentation.Model(model_name=MODEL_NAME).to(device=DEVICE)
-    metrics = segmentation.MetricSegmentation()
-    es = segmentation.EarlyStoppingMonitor(patience=10)
+    dataset = src.SheepsDataset(path=PATH,
+                                to_augment=False,
+                                image_size=IMAGE_SIZE)
 
-    criterion_1 = losses.JaccardLoss(mode='binary', from_logits=False)
-    criterion_2 = losses.DiceLoss(mode='binary', from_logits=False)
+    dataloader = src.SheepsLoader(path=PATH,
+                                  batch_size=BATCH_SIZE,
+                                  img_size=IMAGE_SIZE,
+                                  augment=AUGMENT)
 
-    optimizer = optim.Adam(params=model.parameters(), lr=0.001)
+    gkf = GroupKFold(n_splits=K, shuffle=True, random_state=SEED)
 
-    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer, mode='min', patience=5, cooldown=5
-    )
+    for fold, (train_idxs, val_idxs)\
+        in enumerate(gkf.split(range(len(dataset)),
+                               groups=dataset.get_ids())):
 
-    log = segmentation.Log(batch_size=BATCH_SIZE, comment=MODEL_NAME)
-    log.log_model(model, next(iter(train_dataloader))[0].to(DEVICE))
-    log.log_data_augmentation(augment=dataloader.is_augmented)
+        print(f"Fold {fold + 1}/{K}")
 
-    epoch = 0
+        train_loader = dataloader.get_loader(idxs=train_idxs, split="train")
+        val_loader = dataloader.get_loader(idxs=val_idxs, split="val")
 
-    while epoch < 20:
-        epoch += 1
-        model.train()
-        train_run_loss = []
-        train_metrics: dict = {
-            metric: [] for metric in metrics.metric_functions.keys()
-        }
-        train_samples = tqdm(train_dataloader)
+        model = src.Model(model_name=MODEL_NAME).to(device=DEVICE)
+        optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-        for image, mask in train_samples:
-            image, mask = image.to(DEVICE), mask.to(DEVICE)
-            optimizer.zero_grad()
-            output = model(image)
-            loss = criterion_1(output, mask) + criterion_2(output, mask)
-            loss.backward()
-            optimizer.step()
+        segmentation_report = src.MetricsReport("segmentation")
+        regression_report = src.MetricsReport("regression")
+        es = src.EarlyStoppingMonitor()
+        lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
+                                                        mode='min',
+                                                        patience=10,
+                                                        cooldown=5)
 
-            batch_metrics = metrics.run_metrics(yt=mask, yp=output)
-            for name, value in batch_metrics.items():
-                train_metrics[name].append(value)
+        criterion_seg = losses.DiceLoss(mode='binary', from_logits=False)
+        criterion_reg = nn.MSELoss()
 
-            train_run_loss.append(loss.item())
-            desc = f"Epoch: {epoch} Train Loss: {np.mean(train_run_loss):.4f}"
-            train_samples.set_description(desc=desc)
+        if fold == 0:
+            logger.log_text("Data Augmentation is ON"
+                            if AUGMENT else "Data Augmentation is OFF")
 
-        # Logging de treino
-        log.log_scalar(scalar=np.mean(train_run_loss), epoch=epoch,
-                       scalar_name="Loss", split="Train")
+            logger.log_text(f"Image Size:{IMAGE_SIZE}")
 
-        for name, values in train_metrics.items():
-            log.log_scalar(scalar=np.mean(values),
-                           epoch=epoch,
-                           scalar_name=name,
-                           split="Train")
-
-        log.log_tensors(image=image,
-                        mask=mask,
-                        output=output,
-                        epoch=epoch,
-                        split="Train")
-
-        # Validação
-        with torch.no_grad():
-            model.eval()
-            val_run_loss = []
-            val_metrics: dict = {
-                metric: [] for metric in metrics.metric_functions.keys()
+        for epoch in range(EPOCH_LIMIT):
+            print(f"Epoch {epoch + 1}")
+            model.train()
+            train_loss = 0.0
+            train_seg_metrics: dict = {
+                metric: []
+                for metric in segmentation_report.metric_functions.keys()
             }
-            val_samples = tqdm(val_dataloader)
 
-            for image, mask in val_samples:
-                image, mask = image.to(DEVICE), mask.to(DEVICE)
-                output = model(image)
-                eval_loss = criterion_1(output, mask) + \
-                    criterion_2(output, mask)
+            train_reg_metrics: dict = {
+                metric: []
+                for metric in regression_report.metric_functions.keys()
+            }
 
-                batch_metrics = metrics.run_metrics(yt=mask, yp=output)
-                for name, value in batch_metrics.items():
-                    val_metrics[name].append(value)
+            train = tqdm(train_loader)
+            for data in train:
+                animal_ids, images, masks, weights = data
+                images = images.to(DEVICE)
+                masks = masks.to(DEVICE)
+                weights = weights.to(DEVICE)
 
-                val_run_loss.append(eval_loss.item())
-                desc = f"Epoch: {epoch} Val Loss: {np.mean(val_run_loss):.4f}"
-                val_samples.set_description(desc=desc)
+                # Forward pass
+                outputs_seg, outputs_reg = model(images)
 
-            # Logging de validação
-            log.log_scalar(scalar=np.mean(val_run_loss),
-                           epoch=epoch,
-                           scalar_name="Loss",
-                           split="Val")
+                # Loss
+                loss_seg = criterion_seg(outputs_seg, masks)
+                loss_reg = criterion_reg(outputs_reg.squeeze(), weights)
+                loss = LAMBDA_SEG * loss_seg + LAMBDA_REG * loss_reg
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item()
 
-            for name, values in val_metrics.items():
-                log.log_scalar(scalar=np.mean(values),
+                # Metrics
+                seg_metrics = segmentation_report.run_metrics(
+                    yt=masks,
+                    yp=outputs_seg)
+
+                for name, value in seg_metrics.items():
+                    train_seg_metrics[name].append(value)
+
+                reg_metrics = regression_report.run_metrics(
+                    yt=weights,
+                    yp=outputs_reg.squeeze(-1))
+
+                for name, value in reg_metrics.items():
+                    train_reg_metrics[name].append(value)
+
+            avg_train_loss = train_loss / len(train)
+            avg_train_seg_metrics = {k: sum(v) / len(v)
+                                     for k, v in train_seg_metrics.items()}
+
+            avg_train_reg_metrics = {k: sum(v) / len(v)
+                                     for k, v in train_reg_metrics.items()}
+
+            logger.log_metrics(fold,
+                               phase="train",
                                epoch=epoch,
-                               scalar_name=name,
-                               split="Val")
+                               loss=avg_train_loss,
+                               metrics={**avg_train_seg_metrics,
+                                        **avg_train_reg_metrics})
 
-            log.log_tensors(image=image,
-                            mask=mask,
-                            output=output,
-                            epoch=epoch,
-                            split="Val")
+            logger.log_tensor(fold=fold,
+                              phase="train",
+                              epoch=epoch,
+                              animal_ids=animal_ids,
+                              images=images,
+                              true_masks=masks,
+                              pred_masks=outputs_seg,
+                              true_weights=weights,
+                              pred_weights=outputs_reg)
 
-            # Early stopping e ajuste de LR
-            lr_sched.step(np.mean(val_run_loss))
-            wait = es(np.mean(val_run_loss))
-            log.log_scalar(scalar=wait, epoch=epoch,
-                           scalar_name="EarlyStoppingWait",
-                           split="HIPER")
+            print(f"Training Loss: {avg_train_loss:.4f}")
+            desc = (f"Training Fold {fold+1}, Epoch {epoch+1}, "
+                    f"Loss {avg_train_loss:.4f}")
 
+            train.set_description(desc=desc)
+
+            with torch.no_grad():
+                model.eval()
+                val_loss = 0.0
+
+                val_seg_metrics: dict = {
+                    metric: []
+                    for metric in segmentation_report.metric_functions.keys()
+                    }
+
+                val_reg_metrics: dict = {
+                    metric: []
+                    for metric in regression_report.metric_functions.keys()
+                    }
+
+                val = tqdm(val_loader)
+                for data in val:
+                    animal_ids, images, masks, weights = data
+                    images = images.to(DEVICE)
+                    masks = masks.to(DEVICE)
+                    weights = weights.to(DEVICE)
+
+                    outputs_seg, outputs_reg = model(images)
+
+                    loss_seg = criterion_seg(outputs_seg, masks)
+                    loss_reg = criterion_reg(outputs_reg.squeeze(), weights)
+                    loss = LAMBDA_SEG * loss_seg + LAMBDA_REG * loss_reg
+                    val_loss += loss.item()
+
+                    seg_metrics = segmentation_report.run_metrics(
+                        yt=masks,
+                        yp=outputs_seg)
+
+                    for name, value in seg_metrics.items():
+                        val_seg_metrics[name].append(value)
+
+                    reg_metrics = regression_report.run_metrics(
+                        yt=weights,
+                        yp=outputs_reg.squeeze(-1)
+                        )
+
+                    for name, value in reg_metrics.items():
+                        val_reg_metrics[name].append(value)
+
+                avg_val_loss = val_loss / len(val)
+                avg_val_seg_metrics = {k: sum(v) / len(v)
+                                       for k, v in val_seg_metrics.items()}
+
+                avg_val_reg_metrics = {k: sum(v) / len(v)
+                                       for k, v in val_reg_metrics.items()}
+
+                logger.log_metrics(fold=fold,
+                                   phase="val",
+                                   epoch=epoch,
+                                   loss=avg_val_loss,
+                                   metrics={**avg_val_seg_metrics,
+                                            **avg_val_reg_metrics})
+
+                logger.log_tensor(fold=fold,
+                                  phase="val",
+                                  epoch=epoch,
+                                  animal_ids=animal_ids,
+                                  images=images,
+                                  true_masks=masks,
+                                  pred_masks=outputs_seg,
+                                  true_weights=weights,
+                                  pred_weights=outputs_reg,
+                                  n_epochs=5)
+
+                print(f"Validation Loss: {avg_val_loss:.4f}")
+                desc = (
+                        f"validing Fold {fold+1},"
+                        f"Epoch {epoch+1},"
+                        f"Loss {avg_val_loss:.4f}")
+
+                val.set_description(desc=desc)
+
+            lr_sched.step(avg_val_loss)
+            current_lr = optimizer.param_groups[0]['lr']
+
+            es(avg_val_loss)
+            print(f"Current wait: {es.wait}")
             if es.must_stop():
-                print("Early stopped")
+                print(f"Early stopping triggered at epoch {epoch + 1}")
                 break
 
-    # Teste
-    with torch.no_grad():
-        model.eval()
-        test_metrics: dict = {
-            metric: [] for metric in metrics.metric_functions.keys()
-        }
-        test_samples = tqdm(test_dataloader)
-        logged_image = False
-
-        for image, mask in test_samples:
-            image, mask = image.to(DEVICE), mask.to(DEVICE)
-            output = model(image)
-
-            batch_metrics = metrics.run_metrics(yt=mask, yp=output)
-            for name, value in batch_metrics.items():
-                test_metrics[name].append(value)
-
-            if not logged_image:
-                log.log_tensors(image=image,
-                                mask=mask,
-                                output=output,
-                                epoch=epoch,
-                                split="Test")
-                logged_image = True
-
-        for name, values in test_metrics.items():
-            log.log_scalar(scalar=np.mean(values),
-                           epoch=epoch,
-                           scalar_name=name,
-                           split="Test")
-
-            print(f"Test {name}: {np.mean(values):.4f}")
-
-    log.close()
+    logger.close()

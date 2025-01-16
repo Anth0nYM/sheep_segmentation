@@ -2,8 +2,9 @@
 dataloader.py
 dataset/
 mypy.ini
-runs/
+logs/
 reports.csv
+.vscode
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
