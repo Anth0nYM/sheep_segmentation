@@ -29,7 +29,7 @@ if __name__ == '__main__':
     if DEVICE == torch.device(device='cuda'):
         torch.cuda.manual_seed_all(seed=SEED)
 
-    logger = src.Log(k_folds=K)
+    logger = src.Log(k_folds=K, comment="unet_bsz32")
 
     dataset = src.SheepsDataset(path=PATH,
                                 to_augment=False,
