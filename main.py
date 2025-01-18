@@ -25,11 +25,11 @@ if __name__ == '__main__':
 
     PATH = "dataset/will"
     K = 5
-    BATCH_SIZE = 32  # for 512 batch = 16 for 256 batch = 32
-    IMAGE_SIZE = 256, 256
+    BATCH_SIZE = 16  # for 512 batch = 16 for 256 batch = 32
+    IMAGE_SIZE = 512, 512
     MODEL_NAME = 'unet'
     EPOCH_LIMIT = 100
-    AUGMENT = False
+    AUGMENT = True
     LAMBDA_SEG = 1.0
     LAMBDA_REG = 1.0
     SEED = 0
