@@ -27,9 +27,9 @@ if __name__ == '__main__':
     K = 5
     BATCH_SIZE = 16  # for 512 batch = 16 for 256 batch = 32
     IMAGE_SIZE = 512, 512
-    MODEL_NAME = 'unet'
+    MODEL_NAME = 'unetplusplus'
     EPOCH_LIMIT = 100
-    AUGMENT = True
+    AUGMENT = False
     LAMBDA_SEG = 1.0
     LAMBDA_REG = 1.0
     SEED = 0
