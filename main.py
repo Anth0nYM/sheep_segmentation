@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     PATH = "dataset/will"
     K = 5
-    BATCH_SIZE = 16  # for 512 batch = 16 for 256 batch = 32
+    BATCH_SIZE = 8  # for 512 batch = 16 for 256 batch = 32
     IMAGE_SIZE = 512, 512
     MODEL_NAME = 'unetplusplus'
     EPOCH_LIMIT = 100
