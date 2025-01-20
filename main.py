@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.model_selection import GroupKFold
 
 if __name__ == '__main__':
+
     DEVICE = torch.device(device='cuda')\
         if torch.cuda.is_available()\
         else torch.device(device='cpu')
@@ -27,7 +28,8 @@ if __name__ == '__main__':
     K = 5
     BATCH_SIZE = 8  # for 512 batch = 16 for 256 batch = 32
     IMAGE_SIZE = 512, 512
-    MODEL_NAME = 'unetplusplus'
+
+    MODEL_NAME = 'fnp'
     EPOCH_LIMIT = 100
     AUGMENT = False
     LAMBDA_SEG = 1.0
@@ -72,7 +74,7 @@ if __name__ == '__main__':
         es = src.EarlyStoppingMonitor()
         lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                                         mode='min',
-                                                        patience=10,
+                                                        patience=5,
                                                         cooldown=5)
 
         criterion_seg = losses.DiceLoss(mode='binary', from_logits=False)
